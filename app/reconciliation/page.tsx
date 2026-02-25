@@ -53,7 +53,7 @@ export default function ReconciliationPage() {
               type="date"
               value={runDate}
               onChange={(e) => setRunDate(e.target.value)}
-              className="w-full max-w-xs border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="w-full max-w-xs border border-gray-300 rounded-lg px-3 py-2 text-sm text-gray-900 bg-white placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
             />
             <p className="text-xs text-gray-400 mt-1">
               Leave blank to use today minus the days offset below.
@@ -70,7 +70,7 @@ export default function ReconciliationPage() {
               min={1}
               max={365}
               onChange={(e) => setDaysOffset(Number(e.target.value))}
-              className="w-full max-w-xs border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="w-full max-w-xs border border-gray-300 rounded-lg px-3 py-2 text-sm text-gray-900 bg-white placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
             />
             <p className="text-xs text-gray-400 mt-1">
               Number of days to subtract from today if no run date is provided (1–365). Default: 18.
