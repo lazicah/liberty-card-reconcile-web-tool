@@ -5,35 +5,43 @@ const API_BASE_URL =
 
 export const apiClient = axios.create({
   baseURL: API_BASE_URL,
-  timeout: 30000,
+  timeout: 150000,
   headers: { "Content-Type": "application/json" },
 });
 
 // Types
 export interface HealthStatus {
   status: string;
+  message?: string;
   google_sheets_connected: boolean;
   openai_configured: boolean;
-  timestamp?: string;
 }
 
-export interface ChannelMetrics {
-  channel: string;
-  total_revenue: number;
-  total_settlement: number;
-  chargebacks: number;
-  unsettled_claims: number;
-  transaction_count?: number;
+export interface ChannelData {
+  revenue?: number;
+  settlement?: number;
+  charge_back?: number;
+  unsettled_claim?: number;
 }
 
-export interface ReconciliationMetrics {
-  date: string;
+export interface Metrics {
+  run_date: string;
   total_revenue: number;
   total_settlement: number;
-  chargebacks: number;
-  unsettled_claims: number;
-  channel_breakdown: ChannelMetrics[];
+  total_settlement_charge_back: number;
+  total_settlement_unsettled_claims: number;
+  total_bank_isw_unsettled_claims: number;
+  total_bank_isw_charge_back: number;
+  channels: Record<string, ChannelData>;
+}
+
+export interface ReconciliationResponse {
+  status: string;
+  message: string;
+  run_date: string;
+  metrics: Metrics;
   ai_summary?: string;
+  metrics_file_path?: string;
 }
 
 export interface ReconciliationRequest {
@@ -44,8 +52,8 @@ export interface ReconciliationRequest {
 export interface ConfigData {
   spreadsheet_id?: string;
   ai_model?: string;
-  merchant_ids?: string[];
-  sheet_names?: string[];
+  merchant_ids?: Record<string, string | number>;
+  sheet_names?: Record<string, string>;
   [key: string]: unknown;
 }
 
@@ -57,23 +65,21 @@ export async function getHealth(): Promise<HealthStatus> {
 
 export async function runReconciliation(
   payload: ReconciliationRequest
-): Promise<ReconciliationMetrics> {
-  const res = await apiClient.post<ReconciliationMetrics>(
+): Promise<ReconciliationResponse> {
+  const res = await apiClient.post<ReconciliationResponse>(
     "/reconciliation/run",
     payload
   );
   return res.data;
 }
 
-export async function getMetricsByDate(
-  date: string
-): Promise<ReconciliationMetrics> {
-  const res = await apiClient.get<ReconciliationMetrics>(`/metrics/${date}`);
+export async function getMetricsByDate(date: string): Promise<Metrics> {
+  const res = await apiClient.get<Metrics>(`/metrics/${date}`);
   return res.data;
 }
 
-export async function getLatestMetrics(): Promise<ReconciliationMetrics> {
-  const res = await apiClient.get<ReconciliationMetrics>("/metrics/latest");
+export async function getLatestMetrics(): Promise<Metrics> {
+  const res = await apiClient.get<Metrics>("/metrics/latest");
   return res.data;
 }
 
@@ -83,11 +89,13 @@ export async function getConfig(): Promise<ConfigData> {
 }
 
 // Formatters
-export const formatCurrency = (amount: number): string =>
-  new Intl.NumberFormat("en-NG", {
+export const formatCurrency = (amount: number | undefined): string => {
+  if (amount === undefined || amount === null) return "₦0.00";
+  return new Intl.NumberFormat("en-NG", {
     style: "currency",
     currency: "NGN",
   }).format(amount);
+};
 
 export const formatDate = (dateString: string): string =>
   new Date(dateString).toLocaleDateString("en-NG");

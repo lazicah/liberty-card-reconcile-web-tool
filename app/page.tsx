@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useCallback } from "react";
 import Link from "next/link";
-import { getHealth, getLatestMetrics, formatCurrency, formatDate, HealthStatus, ReconciliationMetrics } from "@/lib/api";
+import { getHealth, getLatestMetrics, formatCurrency, formatDate, HealthStatus, Metrics } from "@/lib/api";
 import StatusBadge from "@/components/StatusBadge";
 
 function MetricCard({ title, value }: { title: string; value: string }) {
@@ -17,7 +17,7 @@ function MetricCard({ title, value }: { title: string; value: string }) {
 export default function DashboardPage() {
   const [health, setHealth] = useState<HealthStatus | null>(null);
   const [healthError, setHealthError] = useState<string | null>(null);
-  const [metrics, setMetrics] = useState<ReconciliationMetrics | null>(null);
+  const [metrics, setMetrics] = useState<Metrics | null>(null);
   const [metricsError, setMetricsError] = useState<string | null>(null);
   const [lastRefresh, setLastRefresh] = useState<Date>(new Date());
 
@@ -39,7 +39,7 @@ export default function DashboardPage() {
       setMetrics(data);
       setMetricsError(null);
     } catch {
-      setMetricsError("No metrics available yet.");
+      setMetricsError("No metrics available yet. Run a reconciliation first.");
       setMetrics(null);
     }
   }, []);
@@ -120,7 +120,7 @@ export default function DashboardPage() {
           <h2 className="font-semibold text-gray-900 text-lg">Latest Metrics</h2>
           {metrics && (
             <span className="text-sm text-gray-500">
-              As of {formatDate(metrics.date)}
+              As of {formatDate(metrics.run_date)}
             </span>
           )}
         </div>
@@ -133,8 +133,8 @@ export default function DashboardPage() {
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
             <MetricCard title="Total Revenue" value={formatCurrency(metrics.total_revenue)} />
             <MetricCard title="Total Settlement" value={formatCurrency(metrics.total_settlement)} />
-            <MetricCard title="Chargebacks" value={formatCurrency(metrics.chargebacks)} />
-            <MetricCard title="Unsettled Claims" value={formatCurrency(metrics.unsettled_claims)} />
+            <MetricCard title="Chargebacks" value={formatCurrency(metrics.total_settlement_charge_back)} />
+            <MetricCard title="Unsettled Claims" value={formatCurrency(metrics.total_settlement_unsettled_claims)} />
           </div>
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">

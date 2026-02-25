@@ -66,36 +66,52 @@ export default function ConfigPage() {
         {configError ? (
           <p className="text-red-600 text-sm">{configError}</p>
         ) : config ? (
-          <div className="space-y-3">
+          <div className="space-y-4">
             {config.spreadsheet_id && (
               <ConfigRow label="Spreadsheet ID" value={String(config.spreadsheet_id)} />
             )}
             {config.ai_model && (
               <ConfigRow label="AI Model" value={String(config.ai_model)} />
             )}
-            {config.merchant_ids && Array.isArray(config.merchant_ids) && (
-              <ConfigRow
-                label="Merchant IDs"
-                value={config.merchant_ids.join(", ")}
-              />
+
+            {/* Merchant IDs as a nested table */}
+            {config.merchant_ids && typeof config.merchant_ids === "object" && !Array.isArray(config.merchant_ids) && (
+              <div className="py-2 border-b border-gray-100">
+                <p className="text-sm font-medium text-gray-600 mb-2">Merchant IDs</p>
+                <div className="bg-gray-50 rounded-lg p-3 space-y-1">
+                  {Object.entries(config.merchant_ids).map(([k, v]) => (
+                    <div key={k} className="flex gap-2 text-sm">
+                      <span className="text-gray-500 capitalize w-48 shrink-0">{k.replace(/_/g, " ")}</span>
+                      <span className="font-mono text-gray-900">{String(v)}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
             )}
-            {config.sheet_names && Array.isArray(config.sheet_names) && (
-              <ConfigRow
-                label="Sheet Names"
-                value={config.sheet_names.join(", ")}
-              />
+
+            {/* Sheet Names as a nested table */}
+            {config.sheet_names && typeof config.sheet_names === "object" && !Array.isArray(config.sheet_names) && (
+              <div className="py-2 border-b border-gray-100">
+                <p className="text-sm font-medium text-gray-600 mb-2">Sheet Names</p>
+                <div className="bg-gray-50 rounded-lg p-3 space-y-1">
+                  {Object.entries(config.sheet_names).map(([k, v]) => (
+                    <div key={k} className="flex gap-2 text-sm">
+                      <span className="text-gray-500 capitalize w-48 shrink-0">{k.replace(/_/g, " ")}</span>
+                      <span className="font-mono text-gray-900">{String(v)}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
             )}
-            {/* Render any other top-level keys */}
+
+            {/* Any remaining top-level keys */}
             {Object.entries(config)
-              .filter(
-                ([key]) =>
-                  !["spreadsheet_id", "ai_model", "merchant_ids", "sheet_names"].includes(key)
-              )
+              .filter(([key]) => !["spreadsheet_id", "ai_model", "merchant_ids", "sheet_names"].includes(key))
               .map(([key, val]) => (
                 <ConfigRow
                   key={key}
                   label={key.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase())}
-                  value={typeof val === "object" ? JSON.stringify(val) : String(val)}
+                  value={typeof val === "object" ? JSON.stringify(val, null, 2) : String(val)}
                 />
               ))}
           </div>
@@ -116,9 +132,9 @@ export default function ConfigPage() {
 
 function ConfigRow({ label, value }: { label: string; value: string }) {
   return (
-    <div className="flex flex-col sm:flex-row sm:items-center gap-1 py-2 border-b border-gray-100 last:border-0">
+    <div className="flex flex-col sm:flex-row sm:items-start gap-1 py-2 border-b border-gray-100 last:border-0">
       <span className="text-sm font-medium text-gray-600 sm:w-48 shrink-0">{label}</span>
-      <span className="text-sm text-gray-900 font-mono break-all">{value}</span>
+      <span className="text-sm text-gray-900 font-mono break-all whitespace-pre-wrap">{value}</span>
     </div>
   );
 }

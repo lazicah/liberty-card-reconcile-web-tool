@@ -16,18 +16,18 @@ import {
   getLatestMetrics,
   formatCurrency,
   formatDate,
-  ReconciliationMetrics,
+  Metrics,
 } from "@/lib/api";
 
 ChartJS.register(CategoryScale, LinearScale, BarElement, Title, Tooltip, Legend);
 
 export default function MetricsPage() {
   const [selectedDate, setSelectedDate] = useState("");
-  const [metrics, setMetrics] = useState<ReconciliationMetrics | null>(null);
+  const [metrics, setMetrics] = useState<Metrics | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const load = useCallback(async (fn: () => Promise<ReconciliationMetrics>) => {
+  const load = useCallback(async (fn: () => Promise<Metrics>) => {
     setLoading(true);
     setError(null);
     try {
@@ -59,45 +59,47 @@ export default function MetricsPage() {
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
-    a.download = `metrics-${metrics.date}.json`;
+    a.download = `metrics-${metrics.run_date}.json`;
     a.click();
     URL.revokeObjectURL(url);
   };
 
   const downloadCSV = () => {
-    if (!metrics || !metrics.channel_breakdown) return;
-    const headers = ["Channel", "Revenue", "Settlement", "Chargebacks", "Unsettled Claims"];
-    const rows = metrics.channel_breakdown.map((ch) => [
-      ch.channel,
-      ch.total_revenue,
-      ch.total_settlement,
-      ch.chargebacks,
-      ch.unsettled_claims,
+    if (!metrics || !metrics.channels) return;
+    const headers = ["Channel", "Revenue", "Settlement", "Charge Back", "Unsettled Claim"];
+    const rows = Object.entries(metrics.channels).map(([name, ch]) => [
+      name,
+      ch.revenue ?? "",
+      ch.settlement ?? "",
+      ch.charge_back ?? "",
+      ch.unsettled_claim ?? "",
     ]);
     const csv = [headers, ...rows].map((r) => r.join(",")).join("\n");
     const blob = new Blob([csv], { type: "text/csv" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
-    a.download = `metrics-${metrics.date}.csv`;
+    a.download = `metrics-${metrics.run_date}.csv`;
     a.click();
     URL.revokeObjectURL(url);
   };
 
-  const chartData = metrics?.channel_breakdown
+  const channelEntries = metrics?.channels ? Object.entries(metrics.channels) : [];
+
+  const chartData = channelEntries.length > 0
     ? {
-        labels: metrics.channel_breakdown.map((ch) => ch.channel),
+        labels: channelEntries.map(([name]) => name),
         datasets: [
           {
             label: "Revenue (₦)",
-            data: metrics.channel_breakdown.map((ch) => ch.total_revenue),
+            data: channelEntries.map(([, ch]) => ch.revenue ?? 0),
             backgroundColor: "rgba(59, 130, 246, 0.7)",
             borderColor: "rgb(59, 130, 246)",
             borderWidth: 1,
           },
           {
             label: "Settlement (₦)",
-            data: metrics.channel_breakdown.map((ch) => ch.total_settlement),
+            data: channelEntries.map(([, ch]) => ch.settlement ?? 0),
             backgroundColor: "rgba(16, 185, 129, 0.7)",
             borderColor: "rgb(16, 185, 129)",
             borderWidth: 1,
@@ -160,7 +162,7 @@ export default function MetricsPage() {
         <>
           <div className="flex items-center justify-between">
             <h2 className="font-semibold text-gray-900">
-              Report for {formatDate(metrics.date)}
+              Report for {formatDate(metrics.run_date)}
             </h2>
             <div className="flex gap-2">
               <button
@@ -183,8 +185,8 @@ export default function MetricsPage() {
             {[
               { title: "Total Revenue", value: formatCurrency(metrics.total_revenue) },
               { title: "Total Settlement", value: formatCurrency(metrics.total_settlement) },
-              { title: "Chargebacks", value: formatCurrency(metrics.chargebacks) },
-              { title: "Unsettled Claims", value: formatCurrency(metrics.unsettled_claims) },
+              { title: "Chargebacks", value: formatCurrency(metrics.total_settlement_charge_back) },
+              { title: "Unsettled Claims", value: formatCurrency(metrics.total_settlement_unsettled_claims) },
             ].map((card) => (
               <div
                 key={card.title}
@@ -196,11 +198,23 @@ export default function MetricsPage() {
             ))}
           </div>
 
+          {/* Bank ISW Cards */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div className="bg-white rounded-xl border border-gray-200 p-5 shadow-sm">
+              <p className="text-sm text-gray-500 font-medium">Bank ISW Unsettled Claims</p>
+              <p className="mt-1 text-xl font-bold text-gray-900">{formatCurrency(metrics.total_bank_isw_unsettled_claims)}</p>
+            </div>
+            <div className="bg-white rounded-xl border border-gray-200 p-5 shadow-sm">
+              <p className="text-sm text-gray-500 font-medium">Bank ISW Chargebacks</p>
+              <p className="mt-1 text-xl font-bold text-gray-900">{formatCurrency(metrics.total_bank_isw_charge_back)}</p>
+            </div>
+          </div>
+
           {/* Chart */}
           {chartData && (
             <div className="bg-white rounded-xl border border-gray-200 p-6 shadow-sm">
               <h3 className="font-semibold text-gray-900 mb-4">
-                Revenue by Channel
+                Revenue & Settlement by Channel
               </h3>
               <div className="h-64">
                 <Bar
@@ -225,7 +239,7 @@ export default function MetricsPage() {
           )}
 
           {/* Channel Table */}
-          {metrics.channel_breakdown && metrics.channel_breakdown.length > 0 && (
+          {channelEntries.length > 0 && (
             <div className="bg-white rounded-xl border border-gray-200 p-6 shadow-sm overflow-x-auto">
               <h3 className="font-semibold text-gray-900 mb-4">Channel Breakdown</h3>
               <table className="w-full text-sm">
@@ -239,13 +253,13 @@ export default function MetricsPage() {
                   </tr>
                 </thead>
                 <tbody>
-                  {metrics.channel_breakdown.map((ch) => (
-                    <tr key={ch.channel} className="border-b border-gray-100 hover:bg-gray-50">
-                      <td className="py-3 font-medium text-gray-900">{ch.channel}</td>
-                      <td className="py-3 text-gray-700">{formatCurrency(ch.total_revenue)}</td>
-                      <td className="py-3 text-gray-700">{formatCurrency(ch.total_settlement)}</td>
-                      <td className="py-3 text-gray-700">{formatCurrency(ch.chargebacks)}</td>
-                      <td className="py-3 text-gray-700">{formatCurrency(ch.unsettled_claims)}</td>
+                  {channelEntries.map(([name, ch]) => (
+                    <tr key={name} className="border-b border-gray-100 hover:bg-gray-50">
+                      <td className="py-3 font-medium text-gray-900">{name}</td>
+                      <td className="py-3 text-gray-700">{ch.revenue !== undefined ? formatCurrency(ch.revenue) : "—"}</td>
+                      <td className="py-3 text-gray-700">{ch.settlement !== undefined ? formatCurrency(ch.settlement) : "—"}</td>
+                      <td className="py-3 text-gray-700">{ch.charge_back !== undefined ? formatCurrency(ch.charge_back) : "—"}</td>
+                      <td className="py-3 text-gray-700">{ch.unsettled_claim !== undefined ? formatCurrency(ch.unsettled_claim) : "—"}</td>
                     </tr>
                   ))}
                 </tbody>

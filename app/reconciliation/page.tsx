@@ -1,13 +1,13 @@
 "use client";
 
 import { useState } from "react";
-import { runReconciliation, formatCurrency, ReconciliationMetrics } from "@/lib/api";
+import { runReconciliation, formatCurrency, ReconciliationResponse } from "@/lib/api";
 
 export default function ReconciliationPage() {
   const [runDate, setRunDate] = useState("");
   const [daysOffset, setDaysOffset] = useState(18);
   const [loading, setLoading] = useState(false);
-  const [result, setResult] = useState<ReconciliationMetrics | null>(null);
+  const [result, setResult] = useState<ReconciliationResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -30,6 +30,9 @@ export default function ReconciliationPage() {
     }
   };
 
+  const metrics = result?.metrics;
+  const channelEntries = metrics?.channels ? Object.entries(metrics.channels) : [];
+
   return (
     <div className="space-y-6">
       <div>
@@ -51,10 +54,9 @@ export default function ReconciliationPage() {
               value={runDate}
               onChange={(e) => setRunDate(e.target.value)}
               className="w-full max-w-xs border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-              placeholder="YYYY-MM-DD"
             />
             <p className="text-xs text-gray-400 mt-1">
-              Leave blank to use the current date.
+              Leave blank to use today minus the days offset below.
             </p>
           </div>
 
@@ -71,7 +73,7 @@ export default function ReconciliationPage() {
               className="w-full max-w-xs border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
             />
             <p className="text-xs text-gray-400 mt-1">
-              Number of days to look back (1–365).
+              Number of days to subtract from today if no run date is provided (1–365). Default: 18.
             </p>
           </div>
 
@@ -101,7 +103,7 @@ export default function ReconciliationPage() {
                 />
               </svg>
             )}
-            {loading ? "Processing…" : "Run Reconciliation"}
+            {loading ? "Processing… (this may take up to 2 minutes)" : "Run Reconciliation"}
           </button>
         </form>
       </div>
@@ -109,19 +111,31 @@ export default function ReconciliationPage() {
       {error && (
         <div className="bg-red-50 border border-red-200 rounded-xl p-4 text-red-700 text-sm">
           <strong>Error:</strong> {error}
+          <div className="mt-2">
+            <button
+              onClick={() => setError(null)}
+              className="text-red-600 underline text-xs"
+            >
+              Dismiss
+            </button>
+          </div>
         </div>
       )}
 
-      {result && (
+      {result && metrics && (
         <div className="space-y-4">
+          <div className="bg-green-50 border border-green-200 rounded-xl p-4 text-green-800 text-sm">
+            <strong>✓ {result.message}</strong> — Run date: {result.run_date}
+          </div>
+
           <h2 className="font-semibold text-gray-900 text-lg">Results</h2>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
             {[
-              { title: "Total Revenue", value: formatCurrency(result.total_revenue) },
-              { title: "Total Settlement", value: formatCurrency(result.total_settlement) },
-              { title: "Chargebacks", value: formatCurrency(result.chargebacks) },
-              { title: "Unsettled Claims", value: formatCurrency(result.unsettled_claims) },
+              { title: "Total Revenue", value: formatCurrency(metrics.total_revenue) },
+              { title: "Total Settlement", value: formatCurrency(metrics.total_settlement) },
+              { title: "Chargebacks", value: formatCurrency(metrics.total_settlement_charge_back) },
+              { title: "Unsettled Claims", value: formatCurrency(metrics.total_settlement_unsettled_claims) },
             ].map((card) => (
               <div
                 key={card.title}
@@ -133,7 +147,19 @@ export default function ReconciliationPage() {
             ))}
           </div>
 
-          {result.channel_breakdown && result.channel_breakdown.length > 0 && (
+          {/* Bank ISW */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div className="bg-white rounded-xl border border-gray-200 p-5 shadow-sm">
+              <p className="text-sm text-gray-500 font-medium">Bank ISW Unsettled Claims</p>
+              <p className="mt-1 text-xl font-bold text-gray-900">{formatCurrency(metrics.total_bank_isw_unsettled_claims)}</p>
+            </div>
+            <div className="bg-white rounded-xl border border-gray-200 p-5 shadow-sm">
+              <p className="text-sm text-gray-500 font-medium">Bank ISW Chargebacks</p>
+              <p className="mt-1 text-xl font-bold text-gray-900">{formatCurrency(metrics.total_bank_isw_charge_back)}</p>
+            </div>
+          </div>
+
+          {channelEntries.length > 0 && (
             <div className="bg-white rounded-xl border border-gray-200 p-6 shadow-sm overflow-x-auto">
               <h3 className="font-semibold text-gray-900 mb-4">Channel Breakdown</h3>
               <table className="w-full text-sm">
@@ -147,13 +173,13 @@ export default function ReconciliationPage() {
                   </tr>
                 </thead>
                 <tbody>
-                  {result.channel_breakdown.map((ch) => (
-                    <tr key={ch.channel} className="border-b border-gray-100 hover:bg-gray-50">
-                      <td className="py-3 font-medium text-gray-900">{ch.channel}</td>
-                      <td className="py-3 text-gray-700">{formatCurrency(ch.total_revenue)}</td>
-                      <td className="py-3 text-gray-700">{formatCurrency(ch.total_settlement)}</td>
-                      <td className="py-3 text-gray-700">{formatCurrency(ch.chargebacks)}</td>
-                      <td className="py-3 text-gray-700">{formatCurrency(ch.unsettled_claims)}</td>
+                  {channelEntries.map(([name, ch]) => (
+                    <tr key={name} className="border-b border-gray-100 hover:bg-gray-50">
+                      <td className="py-3 font-medium text-gray-900">{name}</td>
+                      <td className="py-3 text-gray-700">{ch.revenue !== undefined ? formatCurrency(ch.revenue) : "—"}</td>
+                      <td className="py-3 text-gray-700">{ch.settlement !== undefined ? formatCurrency(ch.settlement) : "—"}</td>
+                      <td className="py-3 text-gray-700">{ch.charge_back !== undefined ? formatCurrency(ch.charge_back) : "—"}</td>
+                      <td className="py-3 text-gray-700">{ch.unsettled_claim !== undefined ? formatCurrency(ch.unsettled_claim) : "—"}</td>
                     </tr>
                   ))}
                 </tbody>
